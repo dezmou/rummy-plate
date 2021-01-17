@@ -9,60 +9,84 @@ class Engine {
   field = Array.from({ length: 13 }).map((e, x) => Array.from({ length: 4 }).map((e, y) => {
     return {
       pos: [x, y],
-      location: "void",
+      location: "pioche",
     }
   }))
+  lastDefausse!: typeof Engine.prototype.field[0][0]
+  turn = "hero"
+  waitAction = "take"
+
   e = {
-    fieldUpdate: new Subject<void>()
+    gameUpdate: new Subject<void>()
   }
 
   constructor() {
     console.log("NEW ENGINE");
   }
 
+  discard() {
+
+  }
+
+  take(fromDefausse: boolean) {
+    const card = fromDefausse ? this.lastDefausse : this.getRandomCardFromPioche()
+    card.location = this.turn
+    this.e.gameUpdate.next()
+  }
+
+  // card? : typeof Engine.prototype.field[0][0]
+
+  nextTurn() {
+    this.turn = this.turn = "hero" ? "vilain" : "hero"
+  }
+
+  getRandomCardFromPioche() {
+    while (true) {
+      const card = this.field[Math.floor(Math.random() * 13)][Math.floor(Math.random() * 4)]
+      if (card.location === 'pioche') {
+        return card
+      }
+    }
+  }
 
   start() {
     // console.log("START");
     const giveCards = (player: string) => {
-      const getRandomCard = () => this.field[Math.floor(Math.random() * 13)][Math.floor(Math.random() * 4)]
       let amountGiven = 0;
-      const card = getRandomCard()
-      console.log(card);
-      while (amountGiven < 10) {
-        const card = getRandomCard()
-        if (card.location == "void") {
-          card.location = player
-          amountGiven += 1
-        }
-      }
+      Array.from({ length: 10 }).forEach(() => {
+        const card = this.getRandomCardFromPioche()
+        card.location = player
+      })
     }
+    this.getRandomCardFromPioche().location = "pioche"
     giveCards("vilain")
     giveCards("hero")
-    this.e.fieldUpdate.next()
+    const card = this.getRandomCardFromPioche()
+    card.location = "defausse"
+    this.lastDefausse = card
+    this.e.gameUpdate.next()
   }
 }
 
 function Card(p: { card: any }) {
-
   return <div
     style={{
       width: "100%",
       height: "24%",
       border: "1px solid black",
-      background: p.card.location === "hero" ? "green" : "grey"
+      background: p.card.location === "hero" ? "green" : "grey",
+      borderRadius: "5%"
     }}
   >
-
   </div>
 }
 
-
 function Game() {
-  const [field, setField] = useState([[]])
+  const [field, setField] = useState<typeof Engine.prototype.field>([[]])
   const engine = useMemo(() => new Engine, [])
 
   useEffect(() => {
-    const obs = engine.e.fieldUpdate.subscribe(() => {
+    const obs = engine.e.gameUpdate.subscribe(() => {
       setField(engine.field as any)
     })
     engine.start()
@@ -97,7 +121,7 @@ function Game() {
 function App() {
   return <>
     <div style={{
-      width: "70vw",
+      width: "100vw",
       height: "50vh",
       border: '1px solid grey',
     }}>
