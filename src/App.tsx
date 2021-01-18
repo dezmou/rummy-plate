@@ -24,23 +24,22 @@ class Engine {
     console.log("NEW ENGINE");
   }
 
-  discard() {
-
-  }
-
-  take(fromDefausse: boolean) {
-    const card = fromDefausse ? this.lastDefausse : this.getRandomCardFromPioche()
-    card.location = this.turn
+  discard = (card: typeof Engine.prototype.field[0][0]) => {
+    console.log(card);
+    card.location = "defausse"
+    this.waitAction = "take"
+    this.turn = this.turn = "hero" ? "vilain" : "hero"
     this.e.gameUpdate.next()
   }
 
-  // card? : typeof Engine.prototype.field[0][0]
-
-  nextTurn() {
-    this.turn = this.turn = "hero" ? "vilain" : "hero"
+  take = (fromDefausse: boolean) => {
+    const card = fromDefausse ? this.lastDefausse : this.getRandomCardFromPioche()
+    card.location = this.turn
+    this.waitAction = "discard"
+    this.e.gameUpdate.next()
   }
 
-  getRandomCardFromPioche() {
+  getRandomCardFromPioche = () => {
     while (true) {
       const card = this.field[Math.floor(Math.random() * 13)][Math.floor(Math.random() * 4)]
       if (card.location === 'pioche') {
@@ -49,7 +48,7 @@ class Engine {
     }
   }
 
-  start() {
+  start = () => {
     // console.log("START");
     const giveCards = (player: string) => {
       let amountGiven = 0;
@@ -68,13 +67,42 @@ class Engine {
   }
 }
 
-function Card(p: { card: any }) {
+const bot = async (engine: Engine) => {
+    engine.take(Math.random() > 0.5)
+}
+
+function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) {
+  const [backColor, setBackColor] = useState("grey")
+
+  useEffect(() => {
+    if (p.card.location === "hero") {
+      setBackColor("green")
+    } else if (p.card.location === "defausse") {
+      setBackColor("purple")
+    } else {
+      setBackColor("grey")
+    }
+  })
+
   return <div
+    onClick={() => {
+      if (p.engine.turn === "hero") {
+        if (p.engine.waitAction === "take") {
+          if (p.card.location === "defausse") {
+            p.engine.take(true)
+          } else if (p.card.location === "pioche") {
+            p.engine.take(false)
+          }
+        } else if (p.engine.waitAction === "discard") {
+          p.engine.discard(p.card)
+        }
+      }
+    }}
     style={{
       width: "100%",
       height: "24%",
       border: "1px solid black",
-      background: p.card.location === "hero" ? "green" : "grey",
+      background: backColor,
       borderRadius: "5%"
     }}
   >
@@ -82,14 +110,19 @@ function Card(p: { card: any }) {
 }
 
 function Game() {
-  const [field, setField] = useState<typeof Engine.prototype.field>([[]])
   const engine = useMemo(() => new Engine, [])
+  const [s, setS] = useState<{ game: Engine }>({ game: engine })
+  // const [field, setField] = useState<typeof Engine.prototype.field>([[]])
 
   useEffect(() => {
     const obs = engine.e.gameUpdate.subscribe(() => {
-      setField(engine.field as any)
+      console.log(engine);
+      setS({ game: engine })
     })
     engine.start()
+    return () => {
+      obs.unsubscribe()
+    }
   }, [])
 
   return <>
@@ -99,7 +132,7 @@ function Game() {
       height: "100%",
       justifyContent: "space-around",
     }}>
-      {field.map((x, ix) => {
+      {s.game.field.map((x, ix) => {
         return <div style={{
           display: "flex",
           justifyContent: "space-around",
@@ -110,7 +143,9 @@ function Game() {
           key={ix}
         >
           {x.map((card, iy) => {
-            return <Card card={card} key={iy}></Card>
+            return <Card
+              engine={engine}
+              card={card} key={iy}></Card>
           })}
         </div>
       })}
