@@ -10,6 +10,7 @@ class Engine {
     return {
       pos: [x, y],
       location: "pioche",
+      openTook: ""
     }
   }))
   lastDefausse!: typeof Engine.prototype.field[0][0]
@@ -25,18 +26,32 @@ class Engine {
   }
 
   discard = (card: typeof Engine.prototype.field[0][0]) => {
-    console.log(card);
+    console.log(this.turn, "DISCARDE");
     card.location = "defausse"
     this.waitAction = "take"
-    this.turn = this.turn = "hero" ? "vilain" : "hero"
+    this.turn = this.turn == "hero" ? "vilain" : "hero"
+    this.lastDefausse = card
     this.e.gameUpdate.next()
   }
 
   take = (fromDefausse: boolean) => {
+    console.log(this.turn, "TAKE");
     const card = fromDefausse ? this.lastDefausse : this.getRandomCardFromPioche()
+    if (fromDefausse) {
+      card.openTook = this.turn
+    }
     card.location = this.turn
     this.waitAction = "discard"
     this.e.gameUpdate.next()
+  }
+
+  getRandomCardFromPlayer = (player: string) => {
+    while (true) {
+      const card = this.field[Math.floor(Math.random() * 13)][Math.floor(Math.random() * 4)]
+      if (card.location === player) {
+        return card
+      }
+    }
   }
 
   getRandomCardFromPioche = () => {
@@ -68,7 +83,12 @@ class Engine {
 }
 
 const bot = async (engine: Engine) => {
-    engine.take(Math.random() > 0.5)
+  const TIME_WAIT = 400
+  await new Promise(resolve => setTimeout(resolve, TIME_WAIT))
+  engine.take(Math.random() > 0.5)
+  // engine.take(false)
+  await new Promise(resolve => setTimeout(resolve, TIME_WAIT))
+  engine.discard(engine.getRandomCardFromPlayer("vilain"))
 }
 
 function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) {
@@ -78,23 +98,36 @@ function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) 
     if (p.card.location === "hero") {
       setBackColor("green")
     } else if (p.card.location === "defausse") {
-      setBackColor("purple")
+      if (p.engine.turn === "hero" && p.engine.lastDefausse === p.card) {
+        setBackColor("#002401")
+      } else {
+        setBackColor("blue")
+      }
     } else {
       setBackColor("grey")
+    }
+    if (p.card.openTook === "vilain") {
+      setBackColor("red")
     }
   })
 
   return <div
     onClick={() => {
+      console.log(p.engine.turn);
       if (p.engine.turn === "hero") {
         if (p.engine.waitAction === "take") {
-          if (p.card.location === "defausse") {
+          if (p.card === p.engine.lastDefausse) {
             p.engine.take(true)
-          } else if (p.card.location === "pioche") {
+          } else {
             p.engine.take(false)
           }
         } else if (p.engine.waitAction === "discard") {
-          p.engine.discard(p.card)
+          if (p.card.location === "hero") {
+            p.engine.discard(p.card)
+          }
+        }
+        if ((p.engine.turn as any) === "vilain") {
+          bot(p.engine)
         }
       }
     }}
@@ -154,13 +187,18 @@ function Game() {
 }
 
 function App() {
+  const [gameId, setGameId] = useState(0)
+
   return <>
     <div style={{
       width: "100vw",
       height: "50vh",
       border: '1px solid grey',
     }}>
-      <Game></Game>
+      <Game key={gameId}></Game>
+      <button onClick={() => {
+        setGameId((e) => e + 1)
+      }}>new game</button>
     </div>
   </>
 }
