@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { Subject } from "rxjs"
+import { createTextSpanFromBounds } from 'typescript';
 
 const X = 0
 const Y = 1
@@ -16,6 +17,7 @@ class Engine {
   lastDefausse!: typeof Engine.prototype.field[0][0]
   turn = "hero"
   waitAction = "take"
+  hasKnock = false;
 
   e = {
     gameUpdate: new Subject<void>()
@@ -25,9 +27,50 @@ class Engine {
     console.log("NEW ENGINE");
   }
 
+  knock = () => {
+    const founds: any[] = []
+
+    for (let y = 0; y < 4; y++) {
+      let found = []
+      for (let x = 0; x < 13; x++) {
+        if (this.field[x][y].location !== this.turn) {
+          if (found.length >= 3) {
+            founds.push(found)
+            found = [];
+          } else {
+            found = [];
+          }
+        } else if (this.field[x][y].location === this.turn) {
+          found.push(this.field[x][y])
+        }
+      }
+    }
+    for (let x = 0; x < 13; x++) {
+      let found = []
+      for (let y = 0; y < 4; y++) {
+        if (this.field[x][y].location === this.turn){
+          found.push(this.field[x][y])
+        }
+      }
+      if (found.length >= 3){
+        founds.push(found)
+      }
+    }
+
+    if (founds.length >= 4){
+      return 0
+    }
+
+    console.log(founds);
+  }
+
   discard = (card: typeof Engine.prototype.field[0][0]) => {
-    console.log(this.turn, "DISCARDE");
     card.location = "defausse"
+    card.openTook = ""
+    if (this.hasKnock) {
+      this.knock()
+      return;
+    }
     this.waitAction = "take"
     this.turn = this.turn == "hero" ? "vilain" : "hero"
     this.lastDefausse = card
@@ -83,10 +126,9 @@ class Engine {
 }
 
 const bot = async (engine: Engine) => {
-  const TIME_WAIT = 400
+  const TIME_WAIT = 100
   await new Promise(resolve => setTimeout(resolve, TIME_WAIT))
   engine.take(Math.random() > 0.5)
-  // engine.take(false)
   await new Promise(resolve => setTimeout(resolve, TIME_WAIT))
   engine.discard(engine.getRandomCardFromPlayer("vilain"))
 }
@@ -98,7 +140,7 @@ function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) 
     if (p.card.location === "hero") {
       setBackColor("green")
     } else if (p.card.location === "defausse") {
-      if (p.engine.turn === "hero" && p.engine.lastDefausse === p.card) {
+      if (p.engine.turn === "hero" && p.engine.lastDefausse === p.card && p.engine.waitAction === "take") {
         setBackColor("#002401")
       } else {
         setBackColor("blue")
@@ -113,7 +155,6 @@ function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) 
 
   return <div
     onClick={() => {
-      console.log(p.engine.turn);
       if (p.engine.turn === "hero") {
         if (p.engine.waitAction === "take") {
           if (p.card === p.engine.lastDefausse) {
@@ -139,6 +180,7 @@ function Card(p: { engine: Engine, card: typeof Engine.prototype.field[0][0] }) 
       borderRadius: "5%"
     }}
   >
+    {p.card.pos[X] + 1}
   </div>
 }
 
@@ -149,7 +191,6 @@ function Game() {
 
   useEffect(() => {
     const obs = engine.e.gameUpdate.subscribe(() => {
-      console.log(engine);
       setS({ game: engine })
     })
     engine.start()
@@ -183,6 +224,11 @@ function Game() {
         </div>
       })}
     </div>
+    <button onClick={() => {
+      engine.hasKnock = true;
+    }}>
+      Knock
+    </button>
   </>
 }
 
@@ -196,6 +242,11 @@ function App() {
       border: '1px solid grey',
     }}>
       <Game key={gameId}></Game>
+      <div style={{
+        height: "40px",
+      }}>
+
+      </div>
       <button onClick={() => {
         setGameId((e) => e + 1)
       }}>new game</button>
